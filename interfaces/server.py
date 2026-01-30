@@ -24,13 +24,11 @@ class RemoteServerInterface:
         self,
         base_url: str = "https://vrtrainer.online",
         *,
-        role: str = "trainer",
         username: str = "Anonymous",
         log: Callable[[str], None] | None = None,
         timeout: float = 6.0,
     ) -> None:
         self.base_url = base_url.rstrip("/")
-        self._role = "trainer" if role == "trainer" else "pet"
         self._username = username.strip() or "Anonymous"
         self._log = log or logging.getLogger(__name__).debug
         self._timeout = timeout
@@ -217,12 +215,12 @@ class RemoteServerInterface:
         )
 
     # Session management ---------------------------------------------
-    def start_session(self, session_label: str | None = None) -> dict[str, Any]:
+    def start_session(self, role: str, session_label: str | None = None) -> dict[str, Any]:
         session_id = (session_label or f"s-{uuid.uuid4().hex[:6]}").strip()
         payload = {
             "session_id": session_id,
             "client_uuid": str(self._client_uuid),
-            "role": self._role,
+            "role": role,
             "username": self._username,
         }
         data = self._post("/sessions", payload)
@@ -236,14 +234,14 @@ class RemoteServerInterface:
             pass
         return self.get_session_details()
 
-    def join_session(self, session_id: str) -> dict[str, Any]:
+    def join_session(self, role: str, session_id: str) -> dict[str, Any]:
         cleaned = session_id.strip()
         if not cleaned:
             raise ValueError("Session code cannot be empty")
 
         payload = {
             "client_uuid": str(self._client_uuid),
-            "role": self._role,
+            "role": role,
             "username": self._username,
         }
         data = self._post(f"/sessions/{cleaned}/join", payload)
@@ -283,7 +281,6 @@ class RemoteServerInterface:
 
         return {
             "connected": self._connected,
-            "role": self._role,
             "username": self._username,
             "session_id": self._session_id,
             "state": self._session_state,
@@ -304,9 +301,6 @@ class RemoteServerInterface:
                 )
             except Exception as exc:
                 self._log(f"username update failed: {exc}")
-
-    def set_role(self, role: str) -> None:
-        self._role = "trainer" if role == "trainer" else "pet"
 
     # Server → client polling ----------------------------------------
     def poll_events(

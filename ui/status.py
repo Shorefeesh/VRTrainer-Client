@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from tkinter import ttk
 
-from logic import services
+from logic.services import Runtime
 
 from .shared import StatusIndicator
 
@@ -34,10 +34,8 @@ def format_osc_status(role: str, snapshot: dict | None) -> str:
         return f"msgs_last_10s={messages}; pet_params={pet_found}/{pet_expected}"
 
 
-def format_pishock_status(status: dict | None, running: bool) -> str:
+def format_pishock_status(status: dict | None) -> str:
     """Summarise PiShock connectivity."""
-    if not running:
-        return "Stopped"
     if status is None:
         return "No data"
     if not status.get("enabled", True):
@@ -49,9 +47,7 @@ def format_pishock_status(status: dict | None, running: bool) -> str:
     return "Not configured"
 
 
-def _osc_colour(running: bool, snapshot: dict | None) -> str:
-    if not running:
-        return "grey"
+def _osc_colour(snapshot: dict | None) -> str:
     if snapshot is None:
         return "orange"
 
@@ -81,9 +77,7 @@ def _pishock_colour(text: str) -> str:
     return "grey"
 
 
-def _whisper_colour(text: str, running: bool) -> str:
-    if not running:
-        return "grey"
+def _whisper_colour(text: str) -> str:
     if not text or text.lower() == "stopped":
         return "red"
     return "green"
@@ -92,8 +86,9 @@ def _whisper_colour(text: str, running: bool) -> str:
 class ConnectionStatusPanel(ttk.LabelFrame):
     """Always-visible personal connection summary."""
 
-    def __init__(self, master, *, refresh_ms: int = 1500) -> None:
+    def __init__(self, master, runtime: Runtime, *, refresh_ms: int = 1500) -> None:
         super().__init__(master, text="Connection status")
+        self._runtime = runtime
         self._refresh_ms = refresh_ms
         self._server_failure_seen = False
 
@@ -134,25 +129,24 @@ class ConnectionStatusPanel(ttk.LabelFrame):
         else:
             self.server_indicator.set_status("Idle", "grey")
 
-    def _update_runtime_indicators(self, role: str | None) -> None:
-        running = services.is_running()
-        osc_status = services.get_osc_status() if running else None
-        pishock_status = services.get_pishock_status() if running else None
-        whisper_status = services.get_whisper_backend() if running else "Stopped"
+    def _update_runtime_indicators(self, role: str | None, runtime: Runtime) -> None:
+        osc_status = runtime.get_osc_status()
+        pishock_status = runtime.get_pishock_status()
+        whisper_status = runtime.get_whisper_backend()
 
-        osc_text = format_osc_status(role or "", osc_status) if running else ("Stopped" if role else "Role not set")
-        self.osc_indicator.set_status(osc_text, _osc_colour(running, osc_status))
+        osc_text = format_osc_status(role or "", osc_status)
+        self.osc_indicator.set_status(osc_text, _osc_colour(osc_status))
 
-        pishock_text = format_pishock_status(pishock_status, running)
+        pishock_text = format_pishock_status(pishock_status)
         self.pishock_indicator.set_status(pishock_text, _pishock_colour(pishock_text))
 
         whisper_text = whisper_status or "Stopped"
-        self.whisper_indicator.set_status(whisper_text, _whisper_colour(whisper_text, running))
+        self.whisper_indicator.set_status(whisper_text, _whisper_colour(whisper_text))
 
     # Refresh loop ---------------------------------------------------
     def _refresh(self) -> None:
         try:
-            details = services.get_server_session_details()
+            details = self._runtime.get_server_session_details()
         except Exception:
             # Treat fetch errors as connection failures.
             self._server_failure_seen = True
@@ -169,6 +163,6 @@ class ConnectionStatusPanel(ttk.LabelFrame):
         role = role_raw if role_raw in {"trainer", "pet"} else None
 
         self._update_server_indicator(connected, events)
-        self._update_runtime_indicators(role)
+        self._update_runtime_indicators(role, self._runtime)
 
         self.after(self._refresh_ms, self._refresh)

@@ -3,8 +3,6 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
-from logic import services
-
 from .shared import LabeledEntry, ScrollableFrame
 
 
@@ -15,6 +13,7 @@ class SessionTab(ScrollableFrame):
         self,
         parent: tk.Misc,
         *,
+        session_client,
         runtime_status_provider=None,
         on_join_trainer=None,
         on_join_pet=None,
@@ -26,6 +25,7 @@ class SessionTab(ScrollableFrame):
         self.container.columnconfigure(0, weight=1)
         self.container.rowconfigure(1, weight=1)
 
+        self._session_client = session_client
         self._runtime_status_provider = runtime_status_provider or (lambda role: {})
         self._on_join_trainer = on_join_trainer
         self._on_join_pet = on_join_pet
@@ -119,7 +119,7 @@ class SessionTab(ScrollableFrame):
     def _start_session(self) -> None:
         role = (self.role_var.get() or "trainer").lower()
         username = self.username_entry.variable.get().strip() or None
-        details = services.start_server_session(session_label=None, username=username, role=role)
+        details = self._session_client.start_server_session(session_label=None, username=username, role=role)
         self._update_from_details(details)
         if role == "trainer" and self._on_join_trainer is not None:
             self._on_join_trainer()
@@ -176,7 +176,7 @@ class SessionTab(ScrollableFrame):
         role = (self.role_var.get() or "trainer").lower()
         username = self.username_entry.variable.get().strip() or None
 
-        details = services.join_server_session(session_id=session_id, username=username, role=role)
+        details = self._session_client.join_server_session(session_id=session_id, username=username, role=role)
         self._update_from_details(details)
 
         if details.get("session_id"):
@@ -193,7 +193,7 @@ class SessionTab(ScrollableFrame):
             self._join_error_var.set("Invalid session ID")
 
     def _leave_session(self) -> None:
-        details = services.leave_server_session()
+        details = self._session_client.leave_server_session()
         self._update_from_details(details)
         # Ensure we always return to the pre-join layout even if the next
         # refresh hasn't landed yet (e.g. network hiccup).
@@ -203,7 +203,7 @@ class SessionTab(ScrollableFrame):
 
     # Details + rendering --------------------------------------------
     def _refresh_details(self) -> None:
-        details = services.get_server_session_details()
+        details = self._session_client.get_server_session_details()
         self._update_from_details(details)
         self.after(1500, self._refresh_details)
 
