@@ -7,8 +7,8 @@ from logic import services
 from logic import profile as trainer_profile
 
 from .logs import EventLogPanel, WhisperLogPanel
-from .trainer import TrainerTab
-from .pet import PetTab
+from .profile import ProfileTab
+from .settings import SettingsTab
 from .stats import StatsTab
 from .session import SessionTab
 from .status import ConnectionStatusPanel, format_osc_status, format_pishock_status
@@ -83,13 +83,12 @@ def build_ui(root: tk.Tk) -> None:
             services.remove_profile_assignments(profile_name)
             session_tab.set_profile_options(trainer_profile.list_profile_names(config))
 
-    trainer_tab = TrainerTab(
+    trainer_tab = ProfileTab(
         notebook,
         on_settings_change=on_trainer_settings_changed,
         on_profile_selected=on_trainer_profile_selected,
         on_profile_renamed=on_trainer_profile_renamed,
         on_profile_deleted=on_trainer_profile_deleted,
-        input_device_var=input_device_var,
     )
 
     # Populate trainer profiles from config.
@@ -109,7 +108,7 @@ def build_ui(root: tk.Tk) -> None:
         config["pet"] = dict(settings)
         save_config(config)
 
-    pet_tab = PetTab(notebook, on_settings_change=on_pet_settings_changed, input_device_var=input_device_var)
+    pet_tab = SettingsTab(notebook, on_settings_change=on_pet_settings_changed, input_device_var=input_device_var)
 
     # Populate available input devices across all tabs.
     devices = list_input_devices()
@@ -120,8 +119,7 @@ def build_ui(root: tk.Tk) -> None:
     if stored_device and stored_device not in display_devices:
         display_devices.append(stored_device)
 
-    for tab in (trainer_tab, pet_tab):
-        tab.set_input_devices(display_devices)
+    pet_tab.set_input_devices(display_devices)
 
     if stored_device:
         input_device_var.set(stored_device)
@@ -136,7 +134,7 @@ def build_ui(root: tk.Tk) -> None:
 
     def _start_trainer_runtime() -> None:
         trainer_settings = trainer_tab.collect_settings()
-        input_device = trainer_tab.input_device
+        input_device = pet_tab.input_device
         services.start_runtime("trainer", trainer_settings, input_device)
 
     def _start_pet_runtime() -> None:

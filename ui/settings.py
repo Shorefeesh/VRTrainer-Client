@@ -31,8 +31,8 @@ def _create_pishock_credentials_frame(
 
     return frame, username, api_key, share_code, shocker_id
 
-class PetTab(ScrollableFrame):
-    """Pet tab UI."""
+class SettingsTab(ScrollableFrame):
+    """Settings tab UI."""
 
     def __init__(self, master, on_settings_change=None, *, input_device_var: tk.StringVar | None = None, **kwargs) -> None:
         super().__init__(master, **kwargs)

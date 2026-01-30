@@ -5,8 +5,8 @@ from logic.feature import ui_feature_definitions
 from .shared import LabeledCheckbutton, LabeledCombobox, LabeledScale, ScrollableFrame
 
 
-class TrainerTab(ScrollableFrame):
-    """Trainer tab UI."""
+class ProfileTab(ScrollableFrame):
+    """Profile tab UI."""
 
     def __init__(
         self,
@@ -15,7 +15,6 @@ class TrainerTab(ScrollableFrame):
         on_profile_selected=None,
         on_profile_renamed=None,
         on_profile_deleted=None,
-        input_device_var: tk.StringVar | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, **kwargs)
@@ -32,7 +31,6 @@ class TrainerTab(ScrollableFrame):
         self._feature_widgets: dict[str, LabeledCheckbutton] = {}
         self._feature_option_widgets: dict[str, LabeledCombobox] = {}
 
-        self._build_input_device_row(input_device_var)
         self._build_profile_section()
         self._build_features_section()
         self._build_word_lists_section()
@@ -43,11 +41,6 @@ class TrainerTab(ScrollableFrame):
 
         self._suppress_callbacks = False
         self._update_profile_visibility()
-
-    # Input device -------------------------------------------------------
-    def _build_input_device_row(self, variable: tk.StringVar | None) -> None:
-        self.input_device_row = LabeledCombobox(self.container, "Input device", variable=variable)
-        self.input_device_row.grid(row=0, column=0, columnspan=2, sticky="ew", padx=12, pady=(12, 6))
 
     # Profile management -------------------------------------------------
     def _build_profile_section(self) -> None:
@@ -271,15 +264,6 @@ class TrainerTab(ScrollableFrame):
             scale.variable.trace_add("write", self._on_any_setting_changed)
 
     # Public helpers -----------------------------------------------------
-    @property
-    def input_device(self) -> str:
-        return self.input_device_row.variable.get()
-
-    def set_input_devices(self, devices) -> None:
-        self.input_device_row.set_values(devices)
-        if devices and not self.input_device_row.variable.get():
-            self.input_device_row.variable.set(devices[0])
-
     def collect_settings(self) -> dict:
         """Collect the current trainer settings into a dictionary."""
         feature_settings = {key: widget.variable.get() for key, widget in self._feature_widgets.items()}
