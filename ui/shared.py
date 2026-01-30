@@ -218,3 +218,53 @@ class TextBoxPanel(ttk.LabelFrame):
 
         self._text.see("end")
         self._text.configure(state="disabled")
+
+
+class WordListInput(ttk.Frame):
+    """Labeled, scrollable Text input that stores one word/phrase per line."""
+
+    def __init__(
+        self,
+        master,
+        label_text: str,
+        *,
+        on_change=None,
+        height: int = 6,
+    ) -> None:
+        super().__init__(master)
+
+        label = ttk.Label(self, text=label_text)
+        label.grid(row=0, column=0, sticky="w")
+
+        text_frame = ttk.Frame(self)
+        text_frame.grid(row=1, column=0, sticky="nsew", pady=(2, 6))
+        text_frame.columnconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+
+        self.text = tk.Text(text_frame, height=height, wrap="word")
+        scroll = ttk.Scrollbar(text_frame, orient="vertical", command=self.text.yview)
+        self.text.configure(yscrollcommand=scroll.set)
+
+        self.text.grid(row=0, column=0, sticky="nsew")
+        scroll.grid(row=0, column=1, sticky="ns")
+
+        if on_change is not None:
+            self.text.bind("<FocusOut>", on_change)
+
+    def get_words(self) -> list[str]:
+        """Return a cleaned list of words from the Text widget."""
+        raw = self.text.get("1.0", "end").strip()
+        if not raw:
+            return []
+        # Treat each non-empty line as a separate word/phrase.
+        return [line.strip() for line in raw.splitlines() if line.strip()]
+
+    def set_words(self, words) -> None:
+        """Populate the Text widget from a stored list or string."""
+        self.text.delete("1.0", "end")
+        if not words:
+            return
+        if isinstance(words, str):
+            self.text.insert("1.0", words)
+        else:
+            self.text.insert("1.0", "\n".join(str(w) for w in words))

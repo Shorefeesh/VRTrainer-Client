@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, simpledialog, messagebox
 
 from logic.feature import ui_feature_definitions
-from .shared import LabeledCheckbutton, LabeledCombobox, LabeledScale, ScrollableFrame
+from .shared import LabeledCheckbutton, LabeledCombobox, LabeledScale, ScrollableFrame, WordListInput
 
 
 class ProfileTab(ScrollableFrame):
@@ -192,53 +192,26 @@ class ProfileTab(ScrollableFrame):
         frame.columnconfigure(2, weight=1)
         self._detail_frames.append(frame)
 
-        # Names ----------------------------------------------------------
-        names_label = ttk.Label(frame, text="Names (one per line)")
-        names_label.grid(row=0, column=0, sticky="w")
+        self.names_input = WordListInput(
+            frame,
+            "Names (one per line)",
+            on_change=self._on_any_setting_changed,
+        )
+        self.names_input.grid(row=0, column=0, rowspan=2, sticky="nsew")
 
-        names_text_frame = ttk.Frame(frame)
-        names_text_frame.grid(row=1, column=0, sticky="nsew", pady=(2, 6))
-        names_text_frame.columnconfigure(0, weight=1)
+        self.scolding_words_input = WordListInput(
+            frame,
+            "Scolding words (one per line)",
+            on_change=self._on_any_setting_changed,
+        )
+        self.scolding_words_input.grid(row=0, column=1, rowspan=2, sticky="nsew")
 
-        self.names_text = tk.Text(names_text_frame, height=6, wrap="word")
-        names_scroll = ttk.Scrollbar(names_text_frame, orient="vertical", command=self.names_text.yview)
-        self.names_text.configure(yscrollcommand=names_scroll.set)
-
-        self.names_text.grid(row=0, column=0, sticky="nsew")
-        names_scroll.grid(row=0, column=1, sticky="ns")
-        self.names_text.bind("<FocusOut>", self._on_any_setting_changed)
-
-        # Scolding words -------------------------------------------------
-        scolding_label = ttk.Label(frame, text="Scolding words (one per line)")
-        scolding_label.grid(row=0, column=1, sticky="w")
-
-        scolding_text_frame = ttk.Frame(frame)
-        scolding_text_frame.grid(row=1, column=1, sticky="nsew", pady=(2, 6))
-        scolding_text_frame.columnconfigure(0, weight=1)
-
-        self.scolding_words_text = tk.Text(scolding_text_frame, height=6, wrap="word")
-        scolding_scroll = ttk.Scrollbar(scolding_text_frame, orient="vertical", command=self.scolding_words_text.yview)
-        self.scolding_words_text.configure(yscrollcommand=scolding_scroll.set)
-
-        self.scolding_words_text.grid(row=0, column=0, sticky="nsew")
-        scolding_scroll.grid(row=0, column=1, sticky="ns")
-        self.scolding_words_text.bind("<FocusOut>", self._on_any_setting_changed)
-
-        # Forbidden words ------------------------------------------------
-        forbidden_label = ttk.Label(frame, text="Forbidden (one per line)")
-        forbidden_label.grid(row=0, column=2, sticky="w")
-
-        forbidden_text_frame = ttk.Frame(frame)
-        forbidden_text_frame.grid(row=1, column=2, sticky="nsew", pady=(2, 6))
-        forbidden_text_frame.columnconfigure(0, weight=1)
-
-        self.forbidden_words_text = tk.Text(forbidden_text_frame, height=6, wrap="word")
-        forbidden_scroll = ttk.Scrollbar(forbidden_text_frame, orient="vertical", command=self.forbidden_words_text.yview)
-        self.forbidden_words_text.configure(yscrollcommand=forbidden_scroll.set)
-
-        self.forbidden_words_text.grid(row=0, column=0, sticky="nsew")
-        forbidden_scroll.grid(row=0, column=1, sticky="ns")
-        self.forbidden_words_text.bind("<FocusOut>", self._on_any_setting_changed)
+        self.forbidden_words_input = WordListInput(
+            frame,
+            "Forbidden (one per line)",
+            on_change=self._on_any_setting_changed,
+        )
+        self.forbidden_words_input.grid(row=0, column=2, rowspan=2, sticky="nsew")
 
     # Scaling ------------------------------------------------------------
     def _build_scaling_section(self) -> None:
@@ -276,9 +249,9 @@ class ProfileTab(ScrollableFrame):
             "cooldown_scale": float(self.cooldown_scale.variable.get()),
             "duration_scale": float(self.duration_scale.variable.get()),
             "strength_scale": float(self.strength_scale.variable.get()),
-            "names": self._get_words_from_text(self.names_text),
-            "scolding_words": self._get_words_from_text(self.scolding_words_text),
-            "forbidden_words": self._get_words_from_text(self.forbidden_words_text),
+            "names": self.names_input.get_words(),
+            "scolding_words": self.scolding_words_input.get_words(),
+            "forbidden_words": self.forbidden_words_input.get_words(),
         }
 
     def apply_profile_settings(self, settings: dict | None) -> None:
@@ -296,9 +269,9 @@ class ProfileTab(ScrollableFrame):
                 self.cooldown_scale.variable.set(1.0)
                 self.duration_scale.variable.set(1.0)
                 self.strength_scale.variable.set(1.0)
-                self._set_words_text(self.names_text, [])
-                self._set_words_text(self.scolding_words_text, [])
-                self._set_words_text(self.forbidden_words_text, [])
+                self.names_input.set_words([])
+                self.scolding_words_input.set_words([])
+                self.forbidden_words_input.set_words([])
             else:
                 # Profile name may come from config; keep UI combobox in sync.
                 profile_name = settings.get("profile")
@@ -324,32 +297,13 @@ class ProfileTab(ScrollableFrame):
                 self.cooldown_scale.variable.set(float(cooldown_scale if cooldown_scale is not None else 1.0))
                 self.duration_scale.variable.set(float(duration_scale if duration_scale is not None else 1.0))
                 self.strength_scale.variable.set(float(strength_scale if strength_scale is not None else 1.0))
-                self._set_words_text(self.names_text, settings.get("names", []))
-                self._set_words_text(self.scolding_words_text, settings.get("scolding_words", []))
-                self._set_words_text(self.forbidden_words_text, settings.get("forbidden_words", []))
+                self.names_input.set_words(settings.get("names", []))
+                self.scolding_words_input.set_words(settings.get("scolding_words", []))
+                self.forbidden_words_input.set_words(settings.get("forbidden_words", []))
         finally:
             self._suppress_callbacks = False
 
         self._update_profile_visibility()
-
-    # Internal helpers ---------------------------------------------------
-    def _get_words_from_text(self, widget: tk.Text) -> list[str]:
-        """Return a cleaned list of words from a Text widget."""
-        raw = widget.get("1.0", "end").strip()
-        if not raw:
-            return []
-        # Treat each non-empty line as a separate word/phrase.
-        return [line.strip() for line in raw.splitlines() if line.strip()]
-
-    def _set_words_text(self, widget: tk.Text, words) -> None:
-        """Populate a Text widget from a stored list or string."""
-        widget.delete("1.0", "end")
-        if not words:
-            return
-        if isinstance(words, str):
-            widget.insert("1.0", words)
-        else:
-            widget.insert("1.0", "\n".join(str(w) for w in words))
 
     # Internal callbacks -------------------------------------------------
     def _on_any_setting_changed(self, *_) -> None:
