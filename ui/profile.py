@@ -265,7 +265,7 @@ class ProfileTab(ScrollableFrame):
 
     # Public helpers -----------------------------------------------------
     def collect_settings(self) -> dict:
-        """Collect the current trainer settings into a dictionary."""
+        """Collect the current profiles into a dictionary."""
         feature_settings = {key: widget.variable.get() for key, widget in self._feature_widgets.items()}
         feature_option_settings = {key: widget.variable.get() for key, widget in self._feature_option_widgets.items()}
         return {
@@ -366,7 +366,7 @@ class ProfileTab(ScrollableFrame):
             self.on_profile_selected(self.profile_row.variable.get())
 
     def _update_profile_visibility(self) -> None:
-        """Show or hide trainer controls based on whether a valid profile is selected."""
+        """Show or hide controls based on whether a valid profile is selected."""
         selected = self.profile_row.variable.get()
         valid_profiles = set(self.profile_row.combobox["values"])
         has_valid_profile = bool(selected and selected in valid_profiles)

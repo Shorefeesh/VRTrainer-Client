@@ -199,8 +199,8 @@ def build_ui(root: tk.Tk) -> None:
 
     session_tab.username_entry.variable.trace_add("write", _on_server_username_changed)
 
-    notebook.add(trainer_tab, text="trainer")
-    notebook.add(pet_tab, text="pet")
+    notebook.add(trainer_tab, text="profiles")
+    notebook.add(pet_tab, text="settings")
     notebook.add(session_tab, text="session")
     notebook.add(stats_tab, text="stats")
 

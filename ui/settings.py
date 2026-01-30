@@ -69,7 +69,7 @@ class SettingsTab(ScrollableFrame):
             self.input_device_row.variable.set(devices[0])
 
     def collect_settings(self) -> dict:
-        """Collect the current pet settings into a dictionary."""
+        """Collect the current settings into a dictionary."""
         return {
             "pishock_username": self.pishock_username.variable.get(),
             "pishock_api_key": self.pishock_api_key.variable.get(),
@@ -78,7 +78,7 @@ class SettingsTab(ScrollableFrame):
         }
 
     def apply_settings(self, settings: dict | None) -> None:
-        """Apply stored pet settings without triggering callbacks."""
+        """Apply stored settings without triggering callbacks."""
         self._suppress_callbacks = True
         try:
             if not settings:
