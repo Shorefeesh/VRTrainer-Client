@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 class Feature:
     """Base feature with common interface wiring and logging."""
 
-    log_name: Optional[str] = None
     ui_label: Optional[str] = None
     role: str = "shared"
     feature_name: str = ""
@@ -26,11 +25,8 @@ class Feature:
         pishock: Any = None,
         whisper: Any = None,
         server: Any = None,
-        logger: Any = None,
         log_manager: SessionLogManager | None = None,
-        log_name: str | None = None,
         config_provider: Callable[[], Dict[str, dict]] | None = None,
-        **_: Any,
     ) -> None:
         self.osc = osc
         self.pishock = pishock
@@ -38,16 +34,7 @@ class Feature:
         self.server = server
         self.config_provider = config_provider
 
-        resolved_log_name = log_name or self.log_name
-        if logger is not None:
-            self._logger = logger
-        elif log_manager is not None and resolved_log_name:
-            try:
-                self._logger = log_manager.get_logger(resolved_log_name)
-            except Exception:
-                self._logger = None
-        else:
-            self._logger = None
+        self._logger = log_manager.get_logger(f"{self.feature_name}_feature.log")
 
         self._running: bool = False
         self._thread: threading.Thread | None = None
@@ -117,14 +104,7 @@ class Feature:
 
     # Logging -----------------------------------------------------------
     def _log(self, message: str) -> None:
-        logger = self._logger
-        if logger is None:
-            return
-
-        try:
-            logger.log(message)
-        except Exception:
-            return
+        self._logger.log(message)
 
     # Config helpers ----------------------------------------------------
     def _config_map(self) -> Dict[str, dict]:
@@ -250,9 +230,6 @@ class FeatureContext:
     config_provider: Callable[[], Dict[str, dict]] | None = None
 
 
-FeatureKwargsBuilder = Callable[[str, FeatureContext], Dict[str, Any]]
-
-
 @dataclass
 class FeatureDefinition:
     """Declarative description of a feature and its runtime wiring."""
@@ -261,11 +238,9 @@ class FeatureDefinition:
     label: str
     trainer_cls: Type[TrainerFeature] | None = None
     pet_cls: Type[PetFeature] | None = None
-    log_name: str = None
     ui_column: int = 0
     ui_dropdown: bool = False
     show_in_ui: bool = True
-    build_kwargs: FeatureKwargsBuilder | None = None
 
     def resolve_class(self, role: str) -> Type[Feature] | None:
         if role == "trainer":
@@ -274,20 +249,14 @@ class FeatureDefinition:
             return self.pet_cls
         return None
 
-    def kwargs_for(self, role: str, context: FeatureContext) -> Dict[str, Any]:
-        if self.build_kwargs is None:
-            return {}
-
-        try:
-            return self.build_kwargs(role, context) or {}
-        except Exception:
-            return {}
-
     @property
     def option_key(self) -> str | None:
         if not self.ui_dropdown:
             return None
-        return f"{self.key}_option"
+
+        cls: Type[Feature] | None = self.trainer_cls or self.pet_cls
+        key = getattr(cls, "option_config_key", None)
+        return key
 
     def option_values(self) -> list[str]:
         """Return available option keys for dropdown-enabled features."""
@@ -295,37 +264,21 @@ class FeatureDefinition:
             return []
 
         cls: Type[Feature] | None = self.trainer_cls or self.pet_cls
-        if cls is None:
-            return []
-
         handlers = getattr(cls, "option_handlers", None)
-        if not handlers:
-            try:
-                instance = cls()
-            except Exception:
-                instance = None
-            handlers = getattr(instance, "option_handlers", None) if instance is not None else None
-
-        if isinstance(handlers, dict):
-            return list(handlers.keys())
-
-        return []
+        return list(handlers.keys())
 
     def build_feature(self, role: str, context: FeatureContext) -> Feature | None:
         cls = self.resolve_class(role)
         if cls is None:
             return None
 
-        kwargs = self.kwargs_for(role, context)
         return cls(
             osc=context.osc,
             pishock=context.pishock,
             whisper=context.whisper,
             server=context.server,
             log_manager=context.log_manager,
-            log_name=self.log_name,
             config_provider=context.config_provider,
-            **kwargs,
         )
 
 
@@ -352,28 +305,24 @@ def feature_definitions() -> List[FeatureDefinition]:
             label="Focus",
             trainer_cls=TrainerFocusFeature,
             pet_cls=FocusFeature,
-            log_name="focus_feature.log",
         ),
         FeatureDefinition(
             key="proximity",
             label="Proximity",
             trainer_cls=TrainerProximityFeature,
             pet_cls=ProximityFeature,
-            log_name="proximity_feature.log",
         ),
         # FeatureDefinition(
         #     key="tricks",
         #     label="Tricks",
         #     trainer_cls=TrainerTricksFeature,
         #     pet_cls=TricksFeature,
-        #     log_name="tricks_feature.log",
         # ),
         FeatureDefinition(
             key="remote",
             label="Remote Control",
             trainer_cls=TrainerRemoteFeature,
             pet_cls=RemoteFeature,
-            log_name="remote_feature.log",
             ui_column=1,
         ),
         FeatureDefinition(
@@ -381,33 +330,28 @@ def feature_definitions() -> List[FeatureDefinition]:
             label="Scolding Words",
             trainer_cls=TrainerScoldingFeature,
             pet_cls=ScoldingFeature,
-            log_name="scolding_feature.log",
         ),
         FeatureDefinition(
             key="forbidden",
             label="Forbidden Words",
             pet_cls=ForbiddenWordsFeature,
-            log_name="forbidden_feature.log",
         ),
         FeatureDefinition(
             key="pull",
             label="Ear/Tail Pull",
             pet_cls=PullFeature,
-            log_name="pull_feature.log",
             ui_column=1,
         ),
         FeatureDefinition(
             key="depth",
             label="Depth",
             pet_cls=DepthFeature,
-            log_name="depth_feature.log",
             ui_column=1,
         ),
         FeatureDefinition(
             key="word_game",
             label="Word Game",
             pet_cls=WordFeature,
-            log_name="wordgame_feature.log",
             ui_column=1,
             ui_dropdown=True,
         ),
