@@ -15,20 +15,19 @@ class WordFeature(PetFeature):
     """
 
     feature_name = "word_game"
+    option_handlers: Dict[str, str] = {
+        "pronouns": "_process_pronouns_text",
+        "letter_e": "_process_letter_e_text",
+        "contractions": "_process_contractions_text",
+        "swear_words": "_process_swear_words_text",
+        "negativity": "_process_negativity_text",
+    }
 
     def __init__(
         self,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-
-        self.option_handlers: Dict[str, Callable[[dict, str], None]] = {
-            "pronouns": self._process_pronouns_text,
-            "letter_e": self._process_letter_e_text,
-            "contractions": self._process_contractions_text,
-            "swear_words": self._process_swear_words_text,
-            "negativity": self._process_negativity_text,
-        }
 
     def start(self) -> None:
         self._start_worker(target=self._worker_loop, name="PetWordFeature")

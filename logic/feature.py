@@ -50,6 +50,11 @@ class Feature:
         self._base_shock_strength_min: float = 10
         self._base_shock_strength_max: float = 50
 
+        self.option_handlers = {
+            key: getattr(self, handler_name)
+            for key, handler_name in self.option_handlers.items()
+        }
+
         self._log("init")
 
 
@@ -254,9 +259,7 @@ class FeatureDefinition:
         if not self.ui_dropdown:
             return None
 
-        cls: Type[Feature] | None = self.trainer_cls or self.pet_cls
-        key = getattr(cls, "option_config_key", None)
-        return key
+        return f"{self.key}_option"
 
     def option_values(self) -> list[str]:
         """Return available option keys for dropdown-enabled features."""
