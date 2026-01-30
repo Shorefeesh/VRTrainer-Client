@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import os
 import queue
+import sys
 import threading
 import time
 import warnings
+import logging
+import sounddevice as sd
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Any
-
-import logging
+from faster_whisper import WhisperModel
 
 _SHARED_WHISPER_MODEL: Any = None
 _SHARED_WHISPER_BACKEND: Optional[str] = None
@@ -61,7 +63,6 @@ class WhisperInterface:
 
         # Lazy-loaded external dependencies; set during start().
         self._whisper_model = None
-        self._sd = None  # sounddevice module
         self._backend_label: Optional[str] = None
 
         # Lock to protect transcript/tag structures.
@@ -80,14 +81,6 @@ class WhisperInterface:
         if self._running:
             return
 
-        # Try importing optional dependencies. Fail soft: if either
-        # import fails, mark as running but without background work.
-        try:  # pragma: no cover - dependency/environment specific
-            import sounddevice as sd  # type: ignore[import-not-found]
-        except Exception:  # pragma: no cover - dependency/environment specific
-            self._running = True
-            return
-
         # Suppress known deprecation warning emitted by ctranslate2 via
         # faster_whisper about ``pkg_resources`` being deprecated.
         warnings.filterwarnings(
@@ -97,26 +90,13 @@ class WhisperInterface:
             module="ctranslate2",
         )
 
-        try:  # pragma: no cover - dependency/environment specific
-            from faster_whisper import WhisperModel  # type: ignore[import-not-found]
-        except Exception:  # pragma: no cover - dependency/environment specific
-            self._running = True
-            self._sd = sd
-            return
-
-        self._sd = sd
-
         # Load a small/fast default model once per process and reuse it.
         global _SHARED_WHISPER_MODEL
         global _SHARED_WHISPER_BACKEND
         with _SHARED_WHISPER_MODEL_LOCK:
             if _SHARED_WHISPER_MODEL is None:
                 cache_dir = self._resolve_whisper_cache_dir()
-                kwargs: Dict[str, Any] = {}
-                if cache_dir is not None:
-                    # Ensure model cache is stored in a stable, project-local directory
-                    # so we do not redownload on every run.
-                    kwargs["download_root"] = str(cache_dir)
+                model_id, kwargs = self._resolve_model_config(cache_dir)
 
                 # Let users override the device/compute type via environment
                 # variables, but default to CPU to avoid CUDA/cuDNN issues on
@@ -130,7 +110,7 @@ class WhisperInterface:
 
                 backend_label = self._format_backend_label(device, compute_type)
 
-                _SHARED_WHISPER_MODEL = WhisperModel("medium", **kwargs)
+                _SHARED_WHISPER_MODEL = WhisperModel(model_id, **kwargs)
                 _SHARED_WHISPER_BACKEND = backend_label
 
             elif _SHARED_WHISPER_BACKEND is None:
@@ -189,15 +169,19 @@ class WhisperInterface:
         """Return a persistent directory for Whisper model downloads.
 
         Prefer the ``WHISPER_CACHE_DIR`` env var if set; otherwise fall
-        back to a project-local ``models/whisper`` directory.
+        back to a stable ``models/whisper`` directory near the source
+        or executable.
         """
         base = os.environ.get("WHISPER_CACHE_DIR")
         if base:
             path = Path(base).expanduser()
         else:
-            # interfaces/whisper.py -> project_root/interfaces/..
-            project_root = Path(__file__).resolve().parent.parent
-            path = project_root / "models" / "whisper"
+            if getattr(sys, "frozen", False):
+                root = Path(sys.executable).resolve().parent
+            else:
+                # interfaces/whisper.py -> project_root/interfaces/..
+                root = Path(__file__).resolve().parent.parent
+            path = root / "models" / "whisper"
 
         try:
             path.mkdir(parents=True, exist_ok=True)
@@ -205,6 +189,40 @@ class WhisperInterface:
             return None
 
         return path
+
+    def _resolve_model_config(self, cache_dir: Optional[Path]) -> tuple[str, Dict[str, Any]]:
+        """Return the model identifier and kwargs for WhisperModel.
+
+        If a cached model directory exists, use it directly to avoid
+        triggering downloads. Otherwise, fall back to the model name
+        with an explicit download root.
+        """
+        model_name = os.environ.get("WHISPER_MODEL", "medium").strip() or "medium"
+        kwargs: Dict[str, Any] = {}
+
+        if cache_dir is None:
+            return model_name, kwargs
+
+        cached_path = self._find_cached_model(cache_dir, model_name)
+        if cached_path is not None:
+            return str(cached_path), kwargs
+
+        # Ensure model cache is stored in a stable, project-local directory
+        # so we do not redownload on every run.
+        kwargs["download_root"] = str(cache_dir)
+        return model_name, kwargs
+
+    @staticmethod
+    def _find_cached_model(cache_dir: Path, model_name: str) -> Optional[Path]:
+        candidates = [
+            cache_dir / model_name,
+            cache_dir / f"whisper-{model_name}",
+            cache_dir / f"faster-whisper-{model_name}",
+        ]
+        for candidate in candidates:
+            if candidate.is_dir() and (candidate / "model.bin").is_file():
+                return candidate
+        return None
 
     @staticmethod
     def _format_backend_label(device: str | None, compute_type: str | None) -> str:
@@ -273,10 +291,6 @@ class WhisperInterface:
         fixed-length buffers, transcribes them synchronously, and
         appends non-empty text to the transcript list.
         """
-        if self._sd is None or self._whisper_model is None:
-            return
-
-        sd = self._sd
         model = self._whisper_model
 
         samplerate = 16000
