@@ -22,7 +22,6 @@ class PiShockInterface:
         api_key: str,
         share_code: str,
         shocker_id: str,
-        role: str = "trainer",
         osc: "VRChatOSCInterface" = None,
     ) -> None:
         """Create a new PiShock interface.
@@ -30,7 +29,6 @@ class PiShockInterface:
         Args:
             username: PiShock account username.
             api_key: PiShock API key.
-            role: Which runtime is using this interface, ``\"trainer\"`` or ``\"pet\"``.
             osc: VRChat OSC interface for mirroring shocks to avatar parameters.
         """
         self.username: Optional[str] = username
@@ -41,13 +39,6 @@ class PiShockInterface:
 
         self.logger = logging.getLogger(__name__)
 
-        # Normalise role so unexpected values fall back to trainer
-        self._role = "pet" if role == "pet" else "trainer"
-        # Only the pet runtime should ever drive the real PiShock/OSC
-        # outputs. On the trainer side, the interface remains inert and
-        # relies on server-mediated actions instead.
-        self._enabled: bool = self._role == "pet"
-
         self._connected: bool = False
         self._api: Optional[pishock.PiShockAPI | pishock.SerialAPI] = None
         self._shocker: Optional[pishock.HTTPShocker | pishock.SerialShocker] = None
@@ -55,13 +46,6 @@ class PiShockInterface:
 
     def start(self) -> None:
         """Initialise the PiShock API client and validate credentials."""
-        if not self._enabled:
-            # Trainer side: intentionally skip PiShock initialisation.
-            self._connected = False
-            self._api = None
-            self._shocker = None
-            self.logger.info("PiShock not enabled")
-            return
 
         try_online = True
 
@@ -112,11 +96,7 @@ class PiShockInterface:
 
     @property
     def is_connected(self) -> bool:
-        return self._enabled and self._connected
-
-    @property
-    def enabled(self) -> bool:
-        return self._enabled
+        return self._connected
 
     def send_shock(
         self,
@@ -131,10 +111,6 @@ class PiShockInterface:
                 0-1 range or an integer 0–15 for whole seconds.
         """
         self.logger.info("PiShock sending shock start")
-
-        if not self._enabled:
-            self.logger.info("PiShock not enabled")
-            return
 
         if not self._connected:
             self.logger.info("PiShock not connected")
@@ -169,10 +145,6 @@ class PiShockInterface:
                 0-1 range or an integer 0–15 for whole seconds.
         """
         self.logger.info("PiShock sending vibration start")
-
-        if not self._enabled:
-            self.logger.info("PiShock not enabled")
-            return
 
         if not self._connected:
             self.logger.info("PiShock not connected")
