@@ -1,30 +1,17 @@
-import tkinter as tk
-from tkinter import ttk
-
 from logic import services
+from .shared import TextBoxPanel
 
 
-class EventLogPanel(ttk.LabelFrame):
+class EventLogPanel(TextBoxPanel):
     """Top-level event log that stays visible regardless of tab."""
 
     def __init__(self, master, *, list_height: int = 6) -> None:
-        super().__init__(master, text="Event log")
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(0, weight=1)
-
-        self._events = tk.Listbox(self, height=list_height)
-        self._events.grid(row=0, column=0, sticky="nsew")
-
-        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self._events.yview)
-        scrollbar.grid(row=0, column=1, sticky="ns")
-        self._events.configure(yscrollcommand=scrollbar.set)
+        super().__init__(master, "Event log", height=list_height)
 
         self._refresh()
 
     def _set_events(self, events: list[str]) -> None:
-        self._events.delete(0, "end")
-        for event in events:
-            self._events.insert("end", event)
+        self._set_text("\n".join(events))
 
     def _refresh(self) -> None:
         try:
@@ -38,62 +25,24 @@ class EventLogPanel(ttk.LabelFrame):
         self.after(1500, self._refresh)
 
 
-class WhisperLogPanel(ttk.LabelFrame):
+class WhisperLogPanel(TextBoxPanel):
     """Whisper transcript that follows the active runtime regardless of tab."""
 
     def __init__(self, master, *, list_height: int = 6) -> None:
-        super().__init__(master, text="Whisper log")
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(0, weight=1)
-
-        self._text = tk.Text(self, height=list_height, wrap="word", state="disabled")
-        self._text.grid(row=0, column=0, sticky="nsew")
-
-        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self._text.yview)
-        scrollbar.grid(row=0, column=1, sticky="ns")
-        self._text.configure(yscrollcommand=scrollbar.set)
+        super().__init__(master, "Whisper log", height=list_height)
 
         self._current_role: str | None = None
         self._current_session: str | None = None
-        self._has_content = False
 
         self._reset_log(role=None)
         self._refresh()
 
     def _reset_log(self, role: str | None) -> None:
-        self._has_content = False
         if role:
             placeholder = f"Waiting for {role} whisper input..."
         else:
             placeholder = "Whisper transcript will appear after starting a trainer or pet runtime."
-        self._set_text(placeholder)
-
-    def _set_text(self, text: str) -> None:
-        self._text.configure(state="normal")
-        self._text.delete("1.0", "end")
-        if text:
-            if not text.endswith("\n"):
-                text += "\n"
-            self._text.insert("end", text)
-        self._text.configure(state="disabled")
-
-    def _append_text(self, text: str) -> None:
-        if not text:
-            return
-
-        if not self._has_content:
-            self._set_text("")
-            self._has_content = True
-
-        self._text.configure(state="normal")
-        self._text.insert("end", text + "\n")
-
-        line_count = int(self._text.index("end-1c").split(".")[0])
-        if line_count > 300:
-            self._text.delete("1.0", f"{line_count - 300}.0")
-
-        self._text.see("end")
-        self._text.configure(state="disabled")
+        self._set_text(placeholder, is_placeholder=True)
 
     def _refresh(self) -> None:
         try:

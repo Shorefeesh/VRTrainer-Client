@@ -162,3 +162,59 @@ class ScrollableFrame(ttk.Frame):
 
         self._canvas.pack(side="left", fill="both", expand=True)
         self._v_scrollbar.pack(side="right", fill="y")
+
+
+class TextBoxPanel(ttk.LabelFrame):
+    """A labeled, scrollable text box for log-style content."""
+
+    def __init__(
+        self,
+        master,
+        title: str,
+        *,
+        height: int = 6,
+        wrap: str = "word",
+        max_lines: int | None = 300,
+    ) -> None:
+        super().__init__(master, text=title)
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+
+        self._text = tk.Text(self, height=height, wrap=wrap, state="disabled")
+        self._text.grid(row=0, column=0, sticky="nsew")
+
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self._text.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        self._text.configure(yscrollcommand=scrollbar.set)
+
+        self._max_lines = max_lines
+        self._has_content = False
+
+    def _set_text(self, text: str, *, is_placeholder: bool = False) -> None:
+        self._has_content = False if is_placeholder else bool(text)
+        self._text.configure(state="normal")
+        self._text.delete("1.0", "end")
+        if text:
+            if not text.endswith("\n"):
+                text += "\n"
+            self._text.insert("end", text)
+        self._text.configure(state="disabled")
+
+    def _append_text(self, text: str) -> None:
+        if not text:
+            return
+
+        if not self._has_content:
+            self._set_text("")
+            self._has_content = True
+
+        self._text.configure(state="normal")
+        self._text.insert("end", text + "\n")
+
+        if self._max_lines is not None:
+            line_count = int(self._text.index("end-1c").split(".")[0])
+            if line_count > self._max_lines:
+                self._text.delete("1.0", f"{line_count - self._max_lines}.0")
+
+        self._text.see("end")
+        self._text.configure(state="disabled")
