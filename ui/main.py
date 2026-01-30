@@ -9,7 +9,6 @@ from logic import profile as trainer_profile
 from .logs import EventLogPanel, WhisperLogPanel
 from .profile import ProfileTab
 from .settings import SettingsTab
-from .stats import StatsTab
 from .session import SessionTab
 from .status import ConnectionStatusPanel, format_osc_status, format_pishock_status
 
@@ -162,7 +161,6 @@ def build_ui(root: tk.Tk) -> None:
         services.publish_runtime_status(role, status)
         return status
 
-    stats_tab = StatsTab(notebook)
     def on_pet_profile_selected(pet_client_id: str, profile_name: str | None) -> None:
         if not profile_name:
             services.assign_profile_to_pet(pet_client_id, None, None)
@@ -202,7 +200,6 @@ def build_ui(root: tk.Tk) -> None:
     notebook.add(trainer_tab, text="profiles")
     notebook.add(pet_tab, text="settings")
     notebook.add(session_tab, text="session")
-    notebook.add(stats_tab, text="stats")
 
     notebook.grid(row=0, column=0, sticky="nsew")
 
