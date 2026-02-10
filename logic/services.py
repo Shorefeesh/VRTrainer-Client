@@ -52,8 +52,7 @@ class Runtime:
 
         self.whisper = WhisperInterface(input_device=input_device)
 
-        if role == "pet":
-            self.osc.start()
+        self.osc.start()
         self.pishock.start()
         self.whisper.start()
 
